@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Космический мониторинг - Шаг в будущее</title>
+    <script src="https://cdn.socket.io/4.5.0/socket.io.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --danger: #dc2626;
+            --success: #16a34a;
+            --warning: #d97706;
+            --bg-dark: #0f172a;
+            --bg-card: #1e293b;
+            --text-light: #f8fafc;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, var(--bg-dark) 0%, #1e1b4b 100%);
+            color: var(--text-light);
+            min-height: 100vh;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            background: linear-gradient(45deg, #60a5fa, #34d399);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .subtitle {
+            font-size: 1.2em;
+            opacity: 0.8;
+        }
+        
+        .dashboard {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        
+        @media (max-width: 768px) {
+            .dashboard {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        .card {
+            background: var(--bg-card);
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+        }
+        
+        .card h2 {
+            margin-bottom: 20px;
+            font-size: 1.4em;
+            color: #60a5fa;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .sensors-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .sensor-card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .sensor-icon {
+            font-size: 2em;
+            margin-bottom: 10px;
+        }
+        
+        .sensor-value {
+            font-size: 1.5em;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .sensor-label {
+            font-size: 0.9em;
+            opacity: 0.8;
+        }
+        
+        .control-panel {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .btn {
+            padding: 15px 25px;
+            border: none;
+            border-radius: 10px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-align: center;
+        }
+        
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+        
+        .btn-danger {
+            background: var(--danger);
+            color: white;
+        }
+        
+        .btn-success {
+            background: var(--success);
+            color: white;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        }
+        
+        .status-indicators {
+            display: flex;
+            justify-content: space-around;
+            margin: 20px 0;
+        }
+        
+        .status-item {
+            text-align: center;
+        }
+        
+        .progress-bar {
+            width: 100px;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+            margin: 10px auto;
+            overflow: hidden;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.3s ease;
+        }
+        
+        .chart-container {
+            height: 300px;
+            margin-top: 20px;
+        }
+        
+        .alert-banner {
+            background: var(--danger);
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+            margin: 20px 0;
+            display: none;
+        }
+        
+        .system-status {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+        
+        .status-normal { background: var(--success); }
+        .status-warning { background: var(--warning); }
+        .status-danger { background: var(--danger); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>🚀 Космический мониторинг</h1>
+            <p class="subtitle">Система телеметрии космического аппарата | Проект "Шаг в будущее"</p>
+            <div class="system-info">
+                Статус: <span id="system-status" class="system-status status-normal">НОРМА</span>
+                Вентилятор: <span id="fan-status">ВЫКЛ</span>
+            </div>
+        </header>
+
+        <div class="alert-banner" id="emergency-alert">
+            🚨 АВАРИЙНАЯ ОСТАНОВКА АКТИВИРОВАНА
+        </div>
+
+        <div class="dashboard">
+            <!-- Левая колонка -->
+            <div class="card">
+                <h2>📊 Основные показатели</h2>
+                <div class="sensors-grid">
+                    <div class="sensor-card">
+                        <div class="sensor-icon">🌡</div>
+                        <div class="sensor-value" id="temperature">24.5°C</div>
+                        <div class="sensor-label">Температура</div>
+                    </div>
+                    <div class="sensor-card">
+                        <div class="sensor-icon">☢️</div>
+                        <div class="sensor-value" id="radiation">12500 лк</div>
+                        <div class="sensor-label">Радиация</div>
+                    </div>
+                    <div class="sensor-card">
+                        <div class="sensor-icon">💧</div>
+                        <div class="sensor-value" id="humidity">45%</div>
+                        <div class="sensor-label">Влажность</div>
+                    </div>
+                    <div class="sensor-card">
+                        <div class="sensor-icon">🔋</div>
+                        <div class="sensor-value" id="voltage">12.4V</div>
+                        <div class="sensor-label">Напряжение</div>
+                    </div>
+                </div>
+
+                <div class="status-indicators">
+                    <div class="status-item">
+                        <div>📶 Сигнал</div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="signal-progress" style="width: 95%; background: #60a5fa;"></div>
+                        </div>
+                        <div id="signal-value">95%</div>
+                    </div>
+                    <div class="status-item">
+                        <div>⚡ Энергия</div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="energy-progress" style="width: 85%; background: #34d399;"></div>
+                        </div>
+                        <div id="energy-value">85%</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Правая колонка -->
+            <div class="card">
+                <h2>🎮 Управление системой</h2>
+                <div class="control-panel">
+                    <button class="btn btn-primary" onclick="controlFan('on')" id="fan-btn">
+                        🌀 ВКЛ Вентилятор
+                    </button>
+                    <button class="btn btn-success" onclick="refreshData()">
+                        🔄 Обновить данные
+                    </button>
+                    <button class="btn btn-danger" onclick="emergencyStop()">
+                        🚨 Аварийная остановка
+                    </button>
+                </div>
+
+                <h2 style="margin-top: 30px;">📈 Графики в реальном времени</h2>
+                <div class="chart-container">
+                    <canvas id="data-chart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Дополнительная информация -->
+        <div class="card">
+            <h2>🛰 Информация о системе</h2>
+            <div class="sensors-grid">
+                <div class="sensor-card">
+                    <div class="sensor-icon">🌡</div>
+                    <div class="sensor-value" id="pressure">1013.2 hPa</div>
+                    <div class="sensor-label">Давление</div>
+                </div>
+                <div class="sensor-card">
+                    <div class="sensor-icon">⏱</div>
+                    <div class="sensor-value" id="update-time">--:--:--</div>
+                    <div class="sensor-label">Последнее обновление</div>
+                </div>
+                <div class="sensor-card">
+                    <div class="sensor-icon">📡</div>
+                    <div class="sensor-value">2.4 Mbps</div>
+                    <div class="sensor-label">Скорость связи</div>
+                </div>
+                <div class="sensor-card">
+                    <div class="sensor-icon">🛰</div>
+                    <div class="sensor-value">124W</div>
+                    <div class="sensor-label">Потребление</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // WebSocket соединение
+        const socket = io();
+        
+        // Инициализация Chart.js
+        const ctx = document.getElementById('data-chart').getContext('2d');
+        const chart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [
+                    {
+                        label: 'Температура (°C)',
+                        data: [],
+                        borderColor: '#ef4444',
+                        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    },
+                    {
+                        label: 'Радиация (тыс. лк)',
+                        data: [],
+                        borderColor: '#84cc16',
+                        backgroundColor: 'rgba(132, 204, 22, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    mode: 'index',
+                    intersect: false
+                },
+                scales: {
+                    x: {
+                        display: true,
+                        title: {
+                            display: true,
+                            text: 'Время'
+                        },
+                        grid: {
+                            color: 'rgba(255, 255, 255, 0.1)'
+                        }
+                    },
+                    y: {
+                        display: true,
+                        grid: {
+                            color: 'rgba(255, 255, 255, 0.1)'
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        labels: {
+                            color: 'white'
+                        }
+                    }
+                }
+            }
+        });
+
+        // Обработка обновлений данных
+        socket.on('data_update', function(data) {
+            updateUI(data);
+            updateChart(data);
+        });
+
+        socket.on('fan_status', function(data) {
+            updateFanButton(data.status);
+        });
+
+        socket.on('emergency_stop', function(data) {
+            showEmergencyAlert();
+            updateUI(data);
+        });
+
+        // Функции обновления интерфейса
+        function updateUI(data) {
+            document.getElementById('temperature').textContent = data.temperature + '°C';
+            document.getElementById('radiation').textContent = data.radiation + ' лк';
+            document.getElementById('humidity').textContent = data.humidity + '%';
+            document.getElementById('voltage').textContent = data.voltage + 'V';
+            document.getElementById('pressure').textContent = data.pressure + ' hPa';
+            
+            document.getElementById('signal-progress').style.width = data.signal_level + '%';
+            document.getElementById('signal-value').textContent = data.signal_level + '%';
+            
+            document.getElementById('system-status').textContent = data.system_status;
+            document.getElementById('fan-status').textContent = data.fan_status;
+            
+            // Обновляем класс статуса
+            const statusElement = document.getElementById('system-status');
+            statusElement.className = 'system-status ';
+            if (data.system_status === 'НОРМА') {
+                statusElement.classList.add('status-normal');
+            } else if (data.system_status === 'ПРЕДУПРЕЖДЕНИЕ') {
+                statusElement.classList.add('status-warning');
+            } else {
+                statusElement.classList.add('status-danger');
+            }
+            
+            updateFanButton(data.fan_status);
+            document.getElementById('update-time').textContent = new Date().toLocaleTimeString();
+        }
+
+        function updateChart(data) {
+            const history = data.historical_data;
+            if (history.length > 0) {
+                const labels = history.map(item => {
+                    const date = new Date(item.timestamp);
+                    return date.toLocaleTimeString();
+                });
+                
+                const temperatures = history.map(item => item.temperature);
+                const radiation = history.map(item => item.radiation / 1000); // Конвертируем в тысячи
+                
+                chart.data.labels = labels;
+                chart.data.datasets[0].data = temperatures;
+                chart.data.datasets[1].data = radiation;
+                chart.update();
+            }
+        }
+
+        function updateFanButton(status) {
+            const btn = document.getElementById('fan-btn');
+            if (status === 'ВКЛ') {
+                btn.textContent = '❌ ВЫКЛ Вентилятор';
+                btn.className = 'btn btn-danger';
+            } else {
+                btn.textContent = '🌀 ВКЛ Вентилятор';
+                btn.className = 'btn btn-primary';
+            }
+        }
+
+        function showEmergencyAlert() {
+            const alert = document.getElementById('emergency-alert');
+            alert.style.display = 'block';
+            
+            // Мигающий эффект
+            let blinkCount = 0;
+            const blinkInterval = setInterval(() => {
+                alert.style.opacity = alert.style.opacity === '0.5' ? '1' : '0.5';
+                blinkCount++;
+                if (blinkCount > 10) {
+                    clearInterval(blinkInterval);
+                    alert.style.opacity = '1';
+                }
+            }, 500);
+        }
+
+        // Функции управления
+        function controlFan(action) {
+            fetch(`/api/fan/${action}`)
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Fan control:', data);
+                });
+        }
+
+        function refreshData() {
+            fetch('/api/data')
+                .then(response => response.json())
+                .then(data => {
+                    updateUI(data);
+                });
+        }
+
+        function emergencyStop() {
+            if (confirm('🚨 ВЫ УВЕРЕНЫ?\n\nАварийная остановка системы!')) {
+                fetch('/api/emergency_stop')
+                    .then(response => response.json())
+                    .then(data => {
+                        console.log('Emergency stop:', data);
+                    });
+            }
+        }
+
+        // Инициализация при загрузке
+        document.addEventListener('DOMContentLoaded', function() {
+            refreshData(); // Загружаем начальные данные
+        });
+    </script>
+</body>
+</html>
